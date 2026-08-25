@@ -59,9 +59,12 @@
             <select name="storage_location" class="form-control" style="width: auto;">
                 <option value="">-- Set Storage Location --</option>
                 <option value="">(none)</option>
-                {% for loc in STORAGE_LOCATIONS %}
-                    <option value="{{ loc }}">{{ loc }}</option>
-                {% endfor %}
+                <option value="Klondike">Klondike</option>
+                <option value="BIDC">BIDC</option>
+                <option value="With Team">With Team</option>
+                <option value="RIDGID Cart">RIDGID Cart</option>
+                <option value="Unsorted Packages">Unsorted Packages</option>
+                <option value="Other">Other</option>
             </select>
             <button type="submit" class="btn small primary">Apply to Selected</button>
         </div>
@@ -128,9 +131,12 @@
                             <td>
                                 <select name="storage_location">
                                     <option value="">(none)</option>
-                                    {% for loc in STORAGE_LOCATIONS %}
-                                        <option value="{{ loc }}" {% if item.storage_location == loc %}selected{% endif %}>{{ loc }}</option>
-                                    {% endfor %}
+                                    <option value="Klondike" {% if item.storage_location == 'Klondike' %}selected{% endif %}>Klondike</option>
+                                    <option value="BIDC" {% if item.storage_location == 'BIDC' %}selected{% endif %}>BIDC</option>
+                                    <option value="With Team" {% if item.storage_location == 'With Team' %}selected{% endif %}>With Team</option>
+                                    <option value="RIDGID Cart" {% if item.storage_location == 'RIDGID Cart' %}selected{% endif %}>RIDGID Cart</option>
+                                    <option value="Unsorted Packages" {% if item.storage_location == 'Unsorted Packages' %}selected{% endif %}>Unsorted Packages</option>
+                                    <option value="Other" {% if item.storage_location == 'Other' %}selected{% endif %}>Other</option>
                                 </select>
                             </td>
                             <td>
