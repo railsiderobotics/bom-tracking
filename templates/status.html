@@ -43,10 +43,39 @@
 
 <section class="card">
     <h3>Items & Order Status</h3>
+    
+    <!-- Bulk Update Toolbar (Admin Only) -->
+    {% if session.get('is_admin') %}
+    <form method="POST" action="{{ url_for('status_bulk_update') }}" id="bulkUpdateForm">
+        <input type="hidden" name="next" value="{{ request.url }}">
+        <div style="background: var(--bg-subtle, #f8f9fa); padding: 12px; border-radius: 6px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <strong>Bulk Actions:</strong>
+            <select name="order_status" class="form-control" style="width: auto;">
+                <option value="">-- Set Order Status --</option>
+                {% for st in ORDER_STATUSES %}
+                    <option value="{{ st }}">{{ st }}</option>
+                {% endfor %}
+            </select>
+            <select name="storage_location" class="form-control" style="width: auto;">
+                <option value="">-- Set Storage Location --</option>
+                <option value="">(none)</option>
+                {% for loc in STORAGE_LOCATIONS %}
+                    <option value="{{ loc }}">{{ loc }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn small primary">Apply to Selected</button>
+        </div>
+    {% endif %}
+
     <div class="table-scroll">
         <table>
             <thead>
                 <tr>
+                    {% if session.get('is_admin') %}
+                    <th style="width: 40px;" class="text-center">
+                        <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)">
+                    </th>
+                    {% endif %}
                     <th>Item</th>
                     <th>Specs</th>
                     {% if session.get('is_admin') %}
@@ -63,6 +92,15 @@
             <tbody>
                 {% for item in items %}
                 <tr>
+                    {% if session.get('is_admin') %}
+                    <td class="text-center">
+                        {% if item.orderable %}
+                        <input type="checkbox" name="row_ids" value="{{ item.id }}" form="bulkUpdateForm" class="row-checkbox">
+                        {% else %}
+                        <span>-</span>
+                        {% endif %}
+                    </td>
+                    {% endif %}
                     <td>{{ item.item }}</td>
                     <td>{{ item.specs }}</td>
                     {% if session.get('is_admin') %}
@@ -78,7 +116,7 @@
                         <td><span>-</span></td>
                         <td><span class="text-muted">Tracked Item</span></td>
                     {% elif session.get('is_admin') %}
-                        <!-- Admin Interactive Form Cells -->
+                        <!-- Admin Interactive Form Cells (Single Row Update) -->
                         <form method="POST" action="{{ url_for('status_update', item_id=item.id) }}">
                             <td>
                                 <select name="order_status">
@@ -114,11 +152,19 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="{% if session.get('is_admin') %}9{% else %}8{% endif %}" class="text-center text-muted">No items found matching your filter criteria.</td>
+                    <td colspan="{% if session.get('is_admin') %}10{% else %}8{% endif %}" class="text-center text-muted">No items found matching your filter criteria.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    {% if session.get('is_admin') %}</form>{% endif %}
 </section>
+
+<script>
+function toggleSelectAll(source) {
+    checkboxes = document.querySelectorAll('.row-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+}
+</script>
 {% endblock %}
