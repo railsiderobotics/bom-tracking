@@ -1,9 +1,11 @@
 import csv
 import io
+import os
 import uuid
 from collections import defaultdict
 from functools import wraps
 
+from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     Response, session
@@ -13,6 +15,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import db
 import parser as bomparser
 import sqlite3
+
+# Load environment variables from a local .env file
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "bom-workspace-dev-secret"
@@ -29,7 +34,8 @@ GOOGLE_SHEET_LINKS = {
 ORDER_STATUSES = db.ORDER_STATUSES
 STORAGE_LOCATIONS = db.STORAGE_LOCATIONS
 
-SHARED_ADMIN_PASSWORD = "adminpassword123"
+# Securely load the admin password from environment variables
+SHARED_ADMIN_PASSWORD = os.getenv("SHARED_ADMIN_PASSWORD", "adminpassword123")
 
 def login_required(f):
     @wraps(f)
@@ -482,10 +488,8 @@ def admin_delete_item(item_id):
 @admin_required
 def handle_approval(sub_id, action):
     if action == 'approve':
-        # Grab submitted checkboxes for needs_return item IDs
         return_item_ids = request.form.getlist("needs_return_items")
         conn = db.get_conn()
-        # Reset all needs_return for this submission first
         conn.execute("UPDATE bom_items SET needs_return = 0 WHERE bom_id = ?", (sub_id,))
         if return_item_ids:
             qmarks = ",".join("?" for _ in return_item_ids)
@@ -509,7 +513,6 @@ def handle_approval(sub_id, action):
 @admin_required
 def admin_returns():
     conn = db.get_conn()
-    # Fetch distinct teams that have items marked for return
     teams_query = conn.execute("SELECT DISTINCT b.team FROM boms b JOIN bom_items bi ON b.id = bi.bom_id WHERE b.active = 1 AND b.status = 'Approved' ORDER BY b.team").fetchall()
     teams = [t["team"] for t in teams_query]
 
