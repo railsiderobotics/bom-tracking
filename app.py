@@ -117,6 +117,7 @@ STORAGE_LOCATIONS = [
     "BIDC",
     "With Team",
     "RIDGID Cart",
+    "Unsorted Packages"
     "Other"
 ]
 
