@@ -23,6 +23,8 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "bom-workspace-dev-secret")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 def get_conn():
     # Neon requires sslmode='require'
