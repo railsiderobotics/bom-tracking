@@ -22,12 +22,10 @@ ORDER_STATUSES = [
 ]
 
 STORAGE_LOCATIONS = [
-    "Bin A",
-    "Bin B",
-    "Shelf 1",
-    "Shelf 2",
-    "Cabinet",
-    "Large Storage",
+    "Klondike",
+    "BIDC",
+    "With Team",
+    "RIDGID Cart",
     "Other"
 ]
 
