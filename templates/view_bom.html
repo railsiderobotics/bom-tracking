@@ -5,7 +5,8 @@
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <div>
         <h1>Project: {{ submission.project }}</h1>
-        <p class="subtitle">Submitted by <strong>{{ submission.team }}</strong> on {{ submission.bom.upload_date[:19] }} (Type: {{ submission.bom_type | title }})</p>
+        <p class="subtitle">Submitted by <strong>{{ submission.team }}</strong> on {{ submission.bom.upload_date[:19] if submission.bom and submission.bom.upload_date else '' }} (Type: {{ submission.bom_type | title }})</p>
+    </div>
     <div>
         <a href="{{ url_for('history') }}" class="btn secondary">Back to History</a>
     </div>

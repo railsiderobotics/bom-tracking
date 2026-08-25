@@ -556,7 +556,6 @@ def review_confirm(token):
     )
     bom_id = cur.fetchone()[0]
     
-    # Safe type helpers for PostgreSQL insertion
     def safe_int(val):
         try:
             return int(val) if val != "" and val is not None else None
@@ -597,7 +596,7 @@ def review_confirm(token):
                 safe_float(it.get("unit_cost")), 
                 safe_float(it.get("total_cost")), 
                 it.get("physical"), 
-                it.get("subsystem"),
+                it.get("subsystem") or "N/A",
                 safe_float(it.get("units_per_package")), 
                 safe_float(it.get("units_per_bot")), 
                 it.get("comments"),
@@ -641,12 +640,13 @@ def history():
 
     for b in boms:
         b_dict = dict(b)
-        items = get_submission(b_dict["id"])["items"]
+        submission = get_submission(b_dict["id"])
+        items = submission["items"] if submission else []
         cost = sum((i["total_cost"] or 0) for i in items if i.get("orderable") or is_special_item_row(i))
         rows.append({
             "bom": b_dict,
             "count": len(items),
-            "orderable": sum(1 for i in items if i["orderable"]),
+            "orderable": sum(1 for i in items if i.get("orderable")),
             "cost": cost,
         })
     return render_template("history.html", rows=rows)
@@ -850,7 +850,6 @@ def admin_teams_view():
     cur = conn.cursor()
     team_names = set()
     
-    # Fetch registered users and their passwords
     cur.execute("SELECT username, password FROM users WHERE is_admin = 0")
     users = cur.fetchall()
     user_passwords = {}
@@ -859,7 +858,6 @@ def admin_teams_view():
             team_names.add(u["username"])
             user_passwords[u["username"]] = u["password"] or "(Not available)"
         
-    # Fetch team names from boms table as well
     cur.execute("SELECT DISTINCT team FROM boms WHERE team IS NOT NULL AND team != ''")
     boms_teams = cur.fetchall()
     for b in boms_teams:
@@ -871,7 +869,6 @@ def admin_teams_view():
         if not t_name:
             continue
             
-        # Total spent query with escaped percent signs (%%) to fix psycopg2 tuple index errors
         cur.execute("""
             SELECT SUM(bi.total_cost) as total_spent
             FROM bom_items bi
@@ -888,22 +885,13 @@ def admin_teams_view():
               )
         """, (str(t_name),))
         spent_row = cur.fetchone()
-        
         total_spent = spent_row["total_spent"] if spent_row and spent_row["total_spent"] is not None else 0.0
         
-        # Pending count query
-        cur.execute(
-            "SELECT COUNT(*) as cnt FROM boms WHERE team = %s AND status = 'Pending' AND active = 1", 
-            (str(t_name),)
-        )
+        cur.execute("SELECT COUNT(*) as cnt FROM boms WHERE team = %s AND status = 'Pending' AND active = 1", (str(t_name),))
         pending_res = cur.fetchone()
         pending_count = pending_res["cnt"] if pending_res else 0
         
-        # Approved count query
-        cur.execute(
-            "SELECT COUNT(*) as cnt FROM boms WHERE team = %s AND status = 'Approved' AND active = 1", 
-            (str(t_name),)
-        )
+        cur.execute("SELECT COUNT(*) as cnt FROM boms WHERE team = %s AND status = 'Approved' AND active = 1", (str(t_name),))
         approved_res = cur.fetchone()
         approved_count = approved_res["cnt"] if approved_res else 0
         
@@ -955,9 +943,7 @@ def matches_view():
 
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(
-        "SELECT * FROM manual_matches WHERE active = 1 ORDER BY id DESC"
-    )
+    cur.execute("SELECT * FROM manual_matches WHERE active = 1 ORDER BY id DESC")
     active_matches = cur.fetchall()
     cur.close()
     conn.close()

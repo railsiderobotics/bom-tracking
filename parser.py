@@ -24,7 +24,8 @@ def _norm(s):
 
 def _cell(grid, r, c):
     if r < len(grid) and c < len(grid[r]):
-        return grid[r][c]
+        val = grid[r][c]
+        return "" if val is None else str(val)
     return ""
 
 
