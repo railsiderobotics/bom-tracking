@@ -1,9 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Tracked Items - BOM Workspace{% endblock %}
+{% block title %}Tracked Items Overview - BOM Workspace{% endblock %}
 
 {% block content %}
-<h1>Tracked Items Management</h1>
-<p class="subtitle">Monitor active order fulfillment and items successfully handed over to teams.</p>
+<div class="page-header">
+    <h2>Tracked Items Overview</h2>
+    <p>Read-only view of order tracking and fulfillment progress for tracked components.</p>
+</div>
 
 <!-- Filters card -->
 <div class="card">
@@ -37,9 +39,9 @@
     </form>
 </div>
 
-<!-- Active Tracked Items -->
+<!-- Read-Only Tracked Items Table -->
 <div class="card">
-    <h2>Active Tracked Items (Pending Handover)</h2>
+    <h3>Tracked Components Status</h3>
     {% if items %}
     <div class="table-scroll">
         <table>
@@ -48,29 +50,29 @@
                     <th>Item</th>
                     <th>Specs</th>
                     <th>Category</th>
-                    <th>Qty</th>
                     <th>Team</th>
                     <th>Project</th>
-                    <th>Comments</th>
-                    <th>Action</th>
+                    <th>Qty</th>
+                    <th>Vendor</th>
+                    <th>Order Status</th>
+                    <th>Storage Location</th>
                 </tr>
             </thead>
             <tbody>
-                {% for i in items %}
+                {% for item in items %}
                 <tr>
-                    <td><strong>{{ i.item }}</strong></td>
-                    <td><span class="mono">{{ i.specs }}</span></td>
-                    <td>{{ i.category }}</td>
-                    <td>{{ i.qty }}</td>
-                    <td>{{ i.team }}</td>
-                    <td>{{ i.project }}</td>
-                    <td class="muted">{{ i.comments }}</td>
+                    <td><strong>{{ item.item }}</strong></td>
+                    <td><span class="mono">{{ item.specs }}</span></td>
+                    <td>{{ item.category }}</td>
+                    <td>{{ item.team }}</td>
+                    <td>{{ item.project }}</td>
+                    <td>{{ item.qty }}</td>
+                    <td>{{ item.resolved_vendor or 'Unspecified' }}</td>
                     <td>
-                        <form method="POST">
-                            <input type="hidden" name="item_id" value="{{ i.id }}">
-                            <input type="hidden" name="action" value="toggle_given">
-                            <button type="submit" class="btn small" style="background: var(--green);">Mark Given</button>
-                        </form>
+                        <span class="badge">{{ item.order_status or 'Not Ordered' }}</span>
+                    </td>
+                    <td>
+                        <span>{{ item.storage_location or '(none)' }}</span>
                     </td>
                 </tr>
                 {% endfor %}
@@ -79,58 +81,9 @@
     </div>
     {% else %}
     <div class="empty-state">
-        <p>No active tracked items found.</p>
+        <p class="text-muted">No tracked items found matching your filter criteria.</p>
     </div>
     {% endif %}
-</div>
-
-<!-- Fulfilled / Given Items Dropdown -->
-<div class="card" style="margin-top: 30px;">
-    <details>
-        <summary style="font-weight: 600; font-size: 1.15rem; cursor: pointer; color: var(--navy);">
-            📦 Items Already Given to Teams ({{ given_items|length }})
-        </summary>
-        <div style="margin-top: 15px;">
-            {% if given_items %}
-            <div class="table-scroll">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th>Specs</th>
-                            <th>Category</th>
-                            <th>Qty</th>
-                            <th>Team</th>
-                            <th>Project</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for i in given_items %}
-                        <tr>
-                            <td><strong>{{ i.item }}</strong></td>
-                            <td><span class="mono">{{ i.specs }}</span></td>
-                            <td>{{ i.category }}</td>
-                            <td>{{ i.qty }}</td>
-                            <td>{{ i.team }}</td>
-                            <td>{{ i.project }}</td>
-                            <td>
-                                <form method="POST">
-                                    <input type="hidden" name="item_id" value="{{ i.id }}">
-                                    <input type="hidden" name="action" value="toggle_given">
-                                    <button type="submit" class="btn small secondary">Unmark Given</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="muted" style="margin-top: 10px;">No items have been marked as given to teams yet.</p>
-            {% endif %}
-        </div>
-    </details>
 </div>
 
 <div style="margin-top: 20px;">

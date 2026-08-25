@@ -814,23 +814,9 @@ def order_view():
     return render_template("order.html", groups=groups, options=options,
                            args=request.args, summary=summary)
 
-@app.route("/order/tracked", methods=["GET", "POST"])
+@app.route("/order/tracked", methods=["GET"])
 @admin_required
 def tracked_view():
-    conn = get_conn()
-    cur = conn.cursor()
-    if request.method == "POST":
-        item_id = request.form.get("item_id")
-        action = request.form.get("action")
-        if action == "toggle_given":
-            cur.execute("UPDATE bom_items SET is_given = NOT COALESCE(is_given, FALSE) WHERE id = %s", (item_id,))
-            conn.commit()
-        cur.close()
-        conn.close()
-        return redirect(url_for("tracked_view"))
-    cur.close()
-    conn.close()
-
     items = fetch_items(active_only=True, orderable_only=False, approved_only=True)
     
     def is_ignored_material(it):
@@ -842,14 +828,11 @@ def tracked_view():
         rv = (it.get("resolved_vendor") or "").lower()
         return ("repeat mk2" in name) or ("railsid" in rv) or ("railside" in rv)
 
-    active_tracked = [i for i in items if i.get("orderable") == 1 and not i.get("is_given") and not is_ignored_material(i) and not is_ignored_by_vendor(i)]
-    given_tracked = [i for i in items if i.get("orderable") == 1 and i.get("is_given") and not is_ignored_material(i) and not is_ignored_by_vendor(i)]
-    
-    active_tracked = apply_filters(active_tracked, request.args)
-    given_tracked = apply_filters(given_tracked, request.args)
+    tracked_items = [i for i in items if not is_ignored_material(i) and not is_ignored_by_vendor(i)]
+    tracked_items = apply_filters(tracked_items, request.args)
     
     options = filter_options(fetch_items(active_only=True, approved_only=True))
-    return render_template("tracked.html", items=active_tracked, given_items=given_tracked, options=options, args=request.args)
+    return render_template("tracked.html", items=tracked_items, options=options, args=request.args)
 
 @app.route("/admin/teams")
 @admin_required
