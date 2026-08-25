@@ -849,20 +849,29 @@ def admin_teams_view():
     conn = get_conn()
     cur = conn.cursor()
     team_names = set()
+    
+    # Fetch registered users and their passwords
     cur.execute("SELECT username, password FROM users WHERE is_admin = 0")
     users = cur.fetchall()
     user_passwords = {}
     for u in users:
-        team_names.add(u["username"])
-        user_passwords[u["username"]] = u["password"] or "(Not available)"
+        if u["username"]:
+            team_names.add(u["username"])
+            user_passwords[u["username"]] = u["password"] or "(Not available)"
         
+    # Fetch team names from boms table as well
     cur.execute("SELECT DISTINCT team FROM boms WHERE team IS NOT NULL AND team != ''")
     boms_teams = cur.fetchall()
     for b in boms_teams:
-        team_names.add(b["team"])
+        if b["team"]:
+            team_names.add(b["team"])
     
     team_data = []
     for t_name in sorted(team_names):
+        if not t_name:
+            continue
+            
+        # Total spent query with tuple-safe parameter passing
         cur.execute("""
             SELECT SUM(bi.total_cost) as total_spent
             FROM bom_items bi
@@ -877,22 +886,26 @@ def admin_teams_view():
                   OR lower(bi.item) LIKE '%stock%'
                   OR lower(bi.specs) LIKE '%stock%'
               )
-        """, (t_name,))
+        """, (str(t_name),))
         spent_row = cur.fetchone()
         
-        total_spent = spent_row["total_spent"] if spent_row and spent_row["total_spent"] else 0.0
+        total_spent = spent_row["total_spent"] if spent_row and spent_row["total_spent"] is not None else 0.0
         
+        # Pending count query
         cur.execute(
             "SELECT COUNT(*) as cnt FROM boms WHERE team = %s AND status = 'Pending' AND active = 1", 
-            (t_name,)
+            (str(t_name),)
         )
-        pending_count = cur.fetchone()["cnt"]
+        pending_res = cur.fetchone()
+        pending_count = pending_res["cnt"] if pending_res else 0
         
+        # Approved count query
         cur.execute(
             "SELECT COUNT(*) as cnt FROM boms WHERE team = %s AND status = 'Approved' AND active = 1", 
-            (t_name,)
+            (str(t_name),)
         )
-        approved_count = cur.fetchone()["cnt"]
+        approved_res = cur.fetchone()
+        approved_count = approved_res["cnt"] if approved_res else 0
         
         team_data.append({
             "username": t_name,
