@@ -556,9 +556,22 @@ def review_confirm(token):
     )
     bom_id = cur.fetchone()[0]
     
+    # Safe type helpers for PostgreSQL insertion
+    def safe_int(val):
+        try:
+            return int(val) if val != "" and val is not None else None
+        except (ValueError, TypeError):
+            return None
+
+    def safe_float(val):
+        try:
+            return float(val) if val != "" and val is not None else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
     for it in pending["items"]:
         specs_lower = (it.get("specs") or "").strip().lower()
-        orderable = 0 if any(k in specs_lower for k in ["filament", "stock", "urethane"]) else it["orderable"]
+        orderable = 0 if any(k in specs_lower for k in ["filament", "stock", "urethane"]) else it.get("orderable", 1)
         
         cur.execute(
             """INSERT INTO bom_items
@@ -569,13 +582,30 @@ def review_confirm(token):
                 order_status, storage_location, is_given, needs_return)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, 0, 0)""",
             (
-                bom_id, it["row_index"], it["category"], it["qty"], it["item"],
-                it["specs"], it["link"], it["vendor"], it["other_vendor"],
-                it["resolved_vendor"], it["event_category"], it["other_category"],
-                it["unit_cost"], it["total_cost"], it["physical"], it["subsystem"],
-                it["units_per_package"], it["units_per_bot"], it["comments"],
-                orderable, it["match_key"], it["flagged"],
-                "Not Ordered", "",
+                bom_id, 
+                safe_int(it.get("row_index")), 
+                it.get("category"), 
+                safe_float(it.get("qty")), 
+                it.get("item"),
+                it.get("specs"), 
+                it.get("link"), 
+                it.get("vendor"), 
+                it.get("other_vendor"),
+                it.get("resolved_vendor"), 
+                it.get("event_category"), 
+                it.get("other_category"),
+                safe_float(it.get("unit_cost")), 
+                safe_float(it.get("total_cost")), 
+                it.get("physical"), 
+                it.get("subsystem"),
+                safe_float(it.get("units_per_package")), 
+                safe_float(it.get("units_per_bot")), 
+                it.get("comments"),
+                safe_int(orderable), 
+                it.get("match_key"), 
+                safe_int(it.get("flagged")),
+                "Not Ordered", 
+                "",
             ),
         )
     conn.commit()
