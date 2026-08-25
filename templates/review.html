@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Review Upload{% endblock %}
+{% block content %}
+<h1>Review before saving</h1>
+<p class="subtitle">
+  <span class="badge badge-ok">{{ "Bot BOM detected" if bom_type == "bot" else "General BOM detected" }}</span>
+  &nbsp;from <strong>{{ filename }}</strong>
+</p>
+
+<div class="summary-strip">
+  <div class="summary-box"><div class="num">{{ items|length }}</div><div class="label">Rows found</div></div>
+  <div class="summary-box"><div class="num">{{ orderable_count }}</div><div class="label">{{ "Included in order" if bom_type=="bot" else "Orderable rows" }}</div></div>
+  {% if bom_type == "bot" %}
+  <div class="summary-box"><div class="num">{{ tracked_count }}</div><div class="label">Tracked only</div></div>
+  {% endif %}
+  <div class="summary-box"><div class="num">{{ flagged|length }}</div><div class="label">Rows needing attention</div></div>
+  <div class="summary-box"><div class="num">{{ est_cost|money }}</div><div class="label">Estimated order cost</div></div>
+</div>
+
+{% if flagged|length > 0 %}
+<div class="checklist card">
+  <strong>Correction checklist ({{ flagged|length }} row(s) flagged)</strong>
+  <p class="muted">These rows will still be saved so you don't lose data, but they're missing information needed for ordering.</p>
+  <ul>
+    {% for row in flagged[:15] %}
+    <li>Row {{ row.row_index }} — "{{ row.item }}": {{ row.flagged }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card">
+  <form method="post" action="{{ url_for('review_confirm', token=token) }}">
+    <input type="hidden" name="team" value="{{ session.get('username') }}">
+    
+    <div>
+      <label>{{ "Bot name" if bom_type == "bot" else "Project name" }}</label>
+      <input type="text" name="project" placeholder="{{ 'e.g. Competition Bot A' if bom_type == 'bot' else 'e.g. Fall build season' }}" required>
+    </div>
+
+    <div style="margin-top:12px;">
+      <label>Notes (optional)</label>
+      <textarea name="notes" rows="2" placeholder="Anything the team should know about this submission"></textarea>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:10px;">
+      <button class="btn" type="submit">Save to shared workspace</button>
+      <a class="btn secondary" href="{{ url_for('upload') }}">Upload a different file instead</a>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('review_cancel', token=token) }}" style="margin-top:8px;">
+    <button class="btn secondary small" type="submit">Discard this upload</button>
+  </form>
+</div>
+
+<h2>Row preview</h2>
+<div class="card table-scroll">
+  <table>
+    <tr>
+      <th>Row</th><th>Subsystem</th><th>Item</th><th>Specs</th><th>Qty</th>
+      <th>Vendor</th><th>Cost</th>
+      {% if bom_type == "bot" %}<th>Order status</th>{% endif %}
+      <th>Status</th>
+    </tr>
+    {% for it in items %}
+    <tr>
+      <td>{{ it.row_index }}</td>
+      <td>{{ it.subsystem }}</td>
+      <td>{{ it.item }}</td>
+      <td>{{ it.specs }}</td>
+      <td>{{ it.qty }}</td>
+      <td>{{ it.resolved_vendor }}</td>
+      <td>{{ it.total_cost|money }}</td>
+      {% if bom_type == "bot" %}
+      <td>
+        {% if it.orderable %}
+          <span class="badge badge-ok">Included in order</span>
+        {% else %}
+          {% set spec_lower = (it.specs or '').lower() %}
+          {% if 'filament' in spec_lower %}
+            <span class="badge badge-warn">Filament</span>
+          {% elif 'stock' in spec_lower %}
+            <span class="badge badge-warn">Stock</span>
+          {% elif 'urethane' in spec_lower %}
+            <span class="badge badge-warn">Urethane</span>
+          {% else %}
+            <span class="badge badge-muted">Tracked Only</span>
+          {% endif %}
+        {% endif %}
+      </td>
+      {% endif %}
+      <td>
+        {% if it.flagged %}<span class="badge badge-warn" title="{{ it.flagged }}">Needs correction</span>
+        {% else %}<span class="badge badge-ok">Accepted</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

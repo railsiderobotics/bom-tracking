@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Manage Teams - BOM Workspace{% endblock %}
+
+{% block content %}
+<h1>Registered Teams Overview</h1>
+<p class="subtitle">Monitor team accounts, credentials, spending, pending reviews, and approved BOM metrics.</p>
+
+<div class="card">
+    <h2>Teams List</h2>
+    {% if team_data %}
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Team Username</th>
+                    <th>Password</th>
+                    <th>Total Spent So Far</th>
+                    <th>Waiting for Review?</th>
+                    <th>Approved BOMs Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in team_data %}
+                <tr>
+                    <td><strong>{{ team.username }}</strong></td>
+                    <td>
+                        <span class="password-field" id="pw-{{ loop.index }}" style="font-family: monospace;">••••••••</span>
+                        <button type="button" class="btn small secondary" onclick="togglePassword('{{ loop.index }}', '{{ team.password }}')" style="margin-left: 10px;">Show</button>
+                    </td>
+                    <td><strong>{{ team.total_spent | money }}</strong></td>
+                    <td>
+                        {% if team.has_pending %}
+                            <span class="badge badge-warn">Yes ({{ team.pending_count }} Pending)</span>
+                        {% else %}
+                            <span class="badge badge-ok">No</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge secondary">{{ team.approved_count }} Approved</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No registered teams found.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function togglePassword(index, actualPassword) {
+    const pwSpan = document.getElementById('pw-' + index);
+    const btn = pwSpan.nextElementSibling;
+    
+    if (pwSpan.textContent === '••••••••') {
+        pwSpan.textContent = actualPassword;
+        btn.textContent = 'Hide';
+        btn.classList.add('danger');
+    } else {
+        pwSpan.textContent = '••••••••';
+        btn.textContent = 'Show';
+        btn.classList.remove('danger');
+    }
+}
+</script>
+{% endblock %}

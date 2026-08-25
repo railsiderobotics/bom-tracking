@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}BOM History - BOM Workspace{% endblock %}
+
+{% block content %}
+<h1>Uploaded BOM history</h1>
+<p class="subtitle">Everything the team has submitted. Remove a BOM to exclude it from combined ordering — it stays here so you can restore it later.</p>
+
+<div class="card">
+    {% if rows %}
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Project</th>
+                    <th>Team</th>
+                    <th>Type</th>
+                    <th>Uploaded</th>
+                    <th>Items</th>
+                    <th>Orderable</th>
+                    <th>Est. cost</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <!-- Clicking the project name opens the BOM details -->
+                    <td>
+                        <a href="{{ url_for('view_team_bom', sub_id=row.bom.id) }}" style="font-weight: bold; color: var(--primary-color); text-decoration: none;">
+                            {{ row.bom.project }}
+                        </a>
+                    </td>
+                    <td>{{ row.bom.team }}</td>
+                    <td><span class="badge secondary">{{ row.bom.bom_type | title }} BOM</span></td>
+                    <td>{{ row.bom.upload_date[:19] }}</td>
+                    <td>{{ row.count }}</td>
+                    <td>{{ row.orderable }}</td>
+                    <td>{{ row.cost | money }}</td>
+                    <td>
+                        {% if row.bom.status == 'Approved' %}
+                            <span class="badge badge-ok">Approved</span>
+                        {% elif row.bom.status == 'Rejected' %}
+                            <span class="badge badge-danger">Rejected</span>
+                        {% else %}
+                            <span class="badge badge-warn">Pending Review</span>
+                        {% endif %}
+                        
+                        {% if row.bom.active %}
+                            <span class="badge badge-ok">Active</span>
+                        {% else %}
+                            <span class="badge badge-muted">Removed</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <a href="{{ url_for('view_team_bom', sub_id=row.bom.id) }}" class="btn small">View</a>
+                            
+                            {% if row.bom.active %}
+                            <form action="{{ url_for('delete_bom', bom_id=row.bom.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn small danger" onclick="return confirm('Remove this BOM from combined ordering?')">Remove</button>
+                            </form>
+                            {% else %}
+                            <form action="{{ url_for('restore_bom', bom_id=row.bom.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn small secondary">Restore</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No BOMs uploaded yet.</p>
+        <a href="{{ url_for('upload') }}" class="btn primary" style="margin-top: 10px;">Upload a BOM</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

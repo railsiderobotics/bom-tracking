@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Pending BOM Approvals</h2>
+</div>
+
+{% if not submissions %}
+    <div class="alert alert-info">No pending BOM submissions requiring approval.</div>
+{% else %}
+    {% for sub in submissions %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Team:</strong> {{ sub.team }} &nbsp;|&nbsp;
+                <strong>Project:</strong> {{ sub.project }} &nbsp;|&nbsp;
+                <span class="text-muted">Uploaded: {{ sub.bom.upload_date[:10] }}</span>
+            </div>
+            <div>
+                <span class="badge bg-warning text-dark">Pending</span>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if sub.bom.notes %}
+                <p><strong>Notes:</strong> {{ sub.bom.notes }}</p>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('handle_approval', sub_id=sub.id, action='approve') }}">
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-bordered align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 60px;" class="text-center" title="Mark item to be returned to the club at end of year">Return?</th>
+                                <th>Item</th>
+                                <th>Specs</th>
+                                <th>Qty</th>
+                                <th>Vendor</th>
+                                <th>Total Cost</th>
+                                <th>Subsystem</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in sub['items'] %}
+                            <tr>
+                                <td class="text-center">
+                                    <div class="form-check d-flex justify-content-center m-0">
+                                        <input class="form-check-input" type="checkbox" name="needs_return_items" value="{{ item.id }}" id="return_check_{{ item.id }}" {% if item.needs_return %}checked{% endif %}>
+                                    </div>
+                                </td>
+                                <td>
+                                    <label for="return_check_{{ item.id }}" style="cursor: pointer; display: block; margin: 0;">
+                                        {{ item.item }}
+                                    </label>
+                                </td>
+                                <td class="small text-muted">{{ item.specs }}</td>
+                                <td>{{ item.qty }}</td>
+                                <td>{{ item.resolved_vendor or item.vendor or 'Unspecified' }}</td>
+                                <td>{{ item.total_cost | money }}</td>
+                                <td>{{ item.subsystem }}</td>
+                                <td>
+                                    <button type="submit" formaction="{{ url_for('admin_delete_item', item_id=item.id) }}" formmethod="POST" class="btn btn-outline-danger btn-sm py-0 px-1" onclick="return confirm('Delete this line item?');">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="submit" formaction="{{ url_for('handle_approval', sub_id=sub.id, action='reject') }}" formmethod="POST" class="btn btn-outline-danger">Reject</button>
+                    <button type="submit" class="btn btn-success">Approve BOM & Save Return Requirements</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}

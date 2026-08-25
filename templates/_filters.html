@@ -1,0 +1,47 @@
+{% macro filter_bar(options, args, action) %}
+<form class="filter-bar card" method="get" action="{{ action }}">
+  <div class="field" style="flex:2; min-width:220px;">
+    <label>Search</label>
+    <input type="text" name="q" value="{{ args.get('q','') }}" placeholder="Item, spec, or comment...">
+  </div>
+  <div class="field">
+    <label>Team</label>
+    <select name="team">
+      <option value="">All teams</option>
+      {% for t in options.teams %}<option value="{{ t }}" {{ "selected" if args.get('team')==t }}>{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Project</label>
+    <select name="project">
+      <option value="">All projects</option>
+      {% for p in options.projects %}<option value="{{ p }}" {{ "selected" if args.get('project')==p }}>{{ p }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Category</label>
+    <select name="category">
+      <option value="">All categories</option>
+      {% for c in options.categories %}<option value="{{ c }}" {{ "selected" if args.get('category')==c }}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Vendor</label>
+    <select name="vendor">
+      <option value="">All vendors</option>
+      {% for v in options.vendors %}<option value="{{ v }}" {{ "selected" if args.get('vendor')==v }}>{{ v }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>BOM type</label>
+    <select name="bom_type">
+      <option value="">Both</option>
+      <option value="bot" {{ "selected" if args.get('bom_type')=='bot' }}>Bot BOM</option>
+      <option value="general" {{ "selected" if args.get('bom_type')=='general' }}>General BOM</option>
+    </select>
+  </div>
+  <div class="field">
+    <button class="btn" type="submit">Apply</button>
+  </div>
+</form>
+{% endmacro %}

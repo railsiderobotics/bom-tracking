@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}View BOM - BOM Workspace{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div>
+        <h1>Project: {{ submission.project }}</h1>
+        <p class="subtitle">Submitted by <strong>{{ submission.team }}</strong> on {{ submission.bom.upload_date[:19] }} (Type: {{ submission.bom_type | title }})</p>
+    <div>
+        <a href="{{ url_for('history') }}" class="btn secondary">Back to History</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3>Submission Metadata</h3>
+    <ul style="list-style: none; padding: 0; display: flex; gap: 30px; margin-top: 10px;">
+        <li><strong>Status:</strong> 
+            {% if submission.status == 'Approved' %}
+                <span class="badge badge-ok">Approved</span>
+            {% elif submission.status == 'Rejected' %}
+                <span class="badge badge-danger">Rejected</span>
+            {% else %}
+                <span class="badge badge-warn">Pending Review</span>
+            {% endif %}
+        </li>
+        <li><strong>Original Filename:</strong> {{ submission.filename }}</li>
+        <li><strong>Total Items:</strong> {{ submission['items'] | length }}</li>
+        <li><strong>Est. Cost:</strong> {{ submission.total_cost | money }}</li>
+    </ul>
+    {% if submission.notes %}
+    <p style="margin-top: 10px;"><strong>Notes:</strong> {{ submission.notes }}</p>
+    {% endif %}
+    {% if session.get('is_admin') %}
+    <div style="margin-top: 12px; display:flex; gap:8px;">
+        {% if submission.status != 'Approved' %}
+        <form method="post" action="{{ url_for('handle_approval', sub_id=submission.id, action='approve') }}">
+            <button type="submit" class="btn">Approve & Add to Tracked</button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('handle_approval', sub_id=submission.id, action='unapprove') }}">
+            <button type="submit" class="btn secondary">Cancel Approval</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('handle_approval', sub_id=submission.id, action='reject') }}">
+            <button type="submit" class="btn secondary" style="color:#d9534f;">Reject</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>BOM Items</h2>
+    {% if submission['items'] %}
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Return?</th>
+                    <th>Item</th>
+                    <th>Specs</th>
+                    <th>Category</th>
+                    <th>Qty</th>
+                    <th>Unit Cost</th>
+                    <th>Total Cost</th>
+                    <th>Vendor</th>
+                    <th>Status</th>
+                    {% if session.get('is_admin') and submission.status == 'Pending' %}
+                    <th>Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in submission['items'] %}
+                <tr>
+                    <td class="text-center">
+                        {% if it.needs_return %}
+                            <span class="badge bg-warning text-dark">Yes</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ it.item }}</strong></td>
+                    <td>{{ it.specs or '-' }}</td>
+                    <td>{{ it.category or '-' }}</td>
+                    <td>{{ it.qty }}</td>
+                    <td>{{ it.unit_cost | money }}</td>
+                    <td>{{ it.total_cost | money }}</td>
+                    <td>{{ it.resolved_vendor or it.vendor or 'Unspecified' }}</td>
+                    <td>
+                        {% if it.orderable %}
+                            <span class="badge secondary">{{ it.order_status or 'Not Ordered' }}</span>
+                        {% else %}
+                            {% if it.display_tracked %}
+                                <span class="badge badge-muted">Tracked Only</span>
+                            {% else %}
+                                <span class="badge secondary">{{ it.order_status or 'Not Ordered' }}</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    {% if session.get('is_admin') and submission.status == 'Pending' %}
+                    <td>
+                        <form action="{{ url_for('admin_delete_item', item_id=it.id) }}" method="POST" style="margin:0;">
+                            <button type="submit" class="btn secondary small" style="color: #d9534f; border-color: #d9534f;" onclick="return confirm('Delete this line item?');">Delete</button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No items found in this BOM submission.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

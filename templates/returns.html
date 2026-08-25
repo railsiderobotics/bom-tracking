@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>End-of-Year Part Returns Tracking</h2>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('admin_returns') }}" class="row g-3 align-items-center">
+            <div class="col-auto">
+                <label for="teamSelect" class="col-form-label fw-bold">Select Team:</label>
+            </div>
+            <div class="col-auto">
+                <select name="team" id="teamSelect" class="form-select" onchange="this.form.submit()">
+                    <option value="">-- Choose a Team --</option>
+                    <option value="ALL" {% if selected_team == 'ALL' %}selected{% endif %}>📦 All Teams (Master List)</option>
+                    {% for t in teams %}
+                        <option value="{{ t }}" {% if selected_team == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <noscript><button type="submit" class="btn btn-primary">Filter</button></noscript>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if selected_team %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            Expected Returns for: <strong>{% if selected_team == 'ALL' %}All Teams{% else %}{{ selected_team }}{% endif %}</strong>
+        </div>
+        <div class="card-body">
+            {% if not return_items %}
+                <div class="alert alert-info mb-0">No items are currently marked for return.</div>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                {% if selected_team == 'ALL' %}<th>Team</th>{% endif %}
+                                <th>Project Source</th>
+                                <th>Item</th>
+                                <th>Specs</th>
+                                <th>Qty</th>
+                                <th>Vendor</th>
+                                <th>Subsystem</th>
+                                <th>Storage Location</th>
+                                <th>Order Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in return_items %}
+                            <tr>
+                                {% if selected_team == 'ALL' %}<td><span class="badge bg-secondary">{{ item.team }}</span></td>{% endif %}
+                                <td>{{ item.project }}</td>
+                                <td class="fw-bold">{{ item.item }}</td>
+                                <td class="small text-muted">{{ item.specs }}</td>
+                                <td>{{ item.qty }}</td>
+                                <td>{{ item.resolved_vendor or 'Unspecified' }}</td>
+                                <td>{{ item.subsystem or '-' }}</td>
+                                <td>{{ item.storage_location or 'Not Assigned' }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ item.order_status or 'Not Ordered' }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% else %}
+    <div class="alert alert-secondary text-center">
+        Please select a team or choose "All Teams" from the dropdown menu above to view expected year-end part returns.
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BOM Workspace{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <a href="{{ url_for('index' if 'index' in url_for.__globals__ else 'upload') }}" class="logo-link">
+                <img src="{{ url_for('static', filename='images/RR Logo.png') }}" alt="RR Logo" class="app-logo">
+                <span>BOM Workspace</span>
+            </a>
+        </div>
+        
+        {% if session.get('user_id') is not none %}
+        <nav>
+            {% if session.get('is_admin') %}
+                <a href="{{ url_for('admin_approvals') }}" class="{% if request.endpoint == 'admin_approvals' %}active{% endif %}">Approvals</a>
+                <a href="{{ url_for('order_view') }}" class="{% if request.endpoint == 'order_view' %}active{% endif %}">Combined Order</a>
+                <a href="{{ url_for('tracked_view') }}" class="{% if request.endpoint == 'tracked_view' %}active{% endif %}">Tracked Items</a>
+                <a href="{{ url_for('vendors_view') }}" class="{% if request.endpoint == 'vendors_view' %}active{% endif %}">Vendors</a>
+                <a href="{{ url_for('matches_view') }}" class="{% if request.endpoint == 'matches_view' %}active{% endif %}">Item Matching</a>
+                <a href="{{ url_for('status_view') }}" class="{% if request.endpoint == 'status_view' %}active{% endif %}">Order Status</a>
+                <a href="{{ url_for('admin_teams_view') }}" class="{% if request.endpoint == 'admin_teams_view' %}active{% endif %}">Teams & Spending</a>
+                <a href="{{ url_for('admin_returns') }}" class="{% if request.endpoint == 'admin_returns' %}active{% endif %}">Part Returns</a>
+            {% else %}
+                <a href="{{ url_for('status_view') }}" class="{% if request.endpoint == 'status_view' %}active{% endif %}">My Status</a>
+            {% endif %}
+            <a href="{{ url_for('upload') }}" class="{% if request.endpoint == 'upload' %}active{% endif %}">Upload BOM</a>
+            <a href="{{ url_for('history') }}" class="{% if request.endpoint == 'history' %}active{% endif %}">BOM History</a>
+            <a href="{{ url_for('logout') }}" class="btn small secondary" style="margin-left: 10px;">Logout ({{ session.get('username') }})</a>
+        </nav>
+        {% endif %}
+    </header>
+
+    <main>
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-stack">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category if category != 'message' else 'info' }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        BOM Workspace &copy; 2026
+    </footer>
+</body>
+</html>

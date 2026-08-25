@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Item Matching - BOM Workspace{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <h1>Review possible matches</h1>
+    <p class="subtitle">Items that share a name but didn't automatically combine (different specs, vendor, or wording). Select two or more rows below that are actually the same purchase and combine them by hand — this stays in effect until you undo it.</p>
+</div>
+
+{% for cluster in clusters %}
+<div class="card" style="margin-bottom: 30px;">
+    <h2>{{ cluster.name }} ({{ cluster.rows | length }} rows)</h2>
+    
+    <form method="POST" action="{{ url_for('matches_combine') }}">
+        <div class="table-scroll" style="margin-top: 15px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">Select</th>
+                        <th>Item</th>
+                        <th>Specs</th>
+                        <th>Vendor</th>
+                        <th>Qty</th>
+                        <th>Link</th>
+                        <th>Team</th>
+                        <th>Project</th>
+                        <th>Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in cluster.rows %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="item_ids" value="{{ r.id }}">
+                        </td>
+                        <td><strong>{{ r.item }}</strong></td>
+                        <td>{{ r.specs or '-' }}</td>
+                        <td>{{ r.resolved_vendor or r.vendor or 'Unspecified' }}</td>
+                        <td>{{ r.qty }}</td>
+                        <td>
+                            {% if r.link %}
+                                <a href="{{ r.link }}" target="_blank" rel="noopener noreferrer">Link</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ r.team }}</td>
+                        <td>{{ r.project }}</td>
+                        <td>{{ r.bom_type | title }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 15px;">
+            <button type="submit" class="btn">Combine Selected Items</button>
+        </div>
+    </form>
+</div>
+{% endfor %}
+
+{% if match_rows %}
+<div class="card">
+    <h2>Active Manual Matches</h2>
+    <div class="table-scroll" style="margin-top: 15px;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Match ID</th>
+                    <th>Combined Items / Projects</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in match_rows %}
+                <tr>
+                    <td><code>{{ m.match.id }}</code></td>
+                    <td>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            {% for row in m.rows %}
+                            <li><strong>{{ row.item }}</strong> ({{ row.team }} - {{ row.project }}) [Qty: {{ row.qty }}]</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td>
+                        <form method="POST" action="{{ url_for('matches_undo', match_id=m.match.id) }}" style="margin:0;">
+                            <button type="submit" class="btn secondary small" style="color: #d9534f; border-color: #d9534f;">Undo Match</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

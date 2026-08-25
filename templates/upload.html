@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Upload a BOM{% endblock %}
+{% block content %}
+<h1>Upload a BOM</h1>
+<p class="subtitle">One upload box — we automatically detect whether it's a Bot BOM or a General Supplies &amp; Projects BOM.</p>
+
+{% if detect_error %}
+<div class="checklist card">
+  <strong>We couldn't confirm the template for "{{ filename }}".</strong>
+  <p>This file didn't match either approved template. Here's what we checked:</p>
+  <h3>General BOM markers</h3>
+  <ul>
+    {% for m in details.general_missing %}<li>{{ m }}</li>{% else %}<li>All General BOM headers matched.</li>{% endfor %}
+  </ul>
+  <h3>Bot BOM markers</h3>
+  <ul>
+    {% for m in details.bot_missing %}<li>{{ m }}</li>{% else %}<li>All Bot BOM headers matched.</li>{% endfor %}
+  </ul>
+  <p>Please download a fresh copy of the correct template below, fill it out, export as CSV (or upload the .xlsx directly), and try again.</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+    <label>Completed BOM spreadsheet (.csv or .xlsx)</label>
+    <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
+    <p class="muted" style="margin-top:10px;">
+      We check the sheet's structure automatically — a General BOM is recognized by the "Comments" label
+      in column L of the header row, and a Bot BOM by "Comments" in column O. If neither matches,
+      we'll tell you exactly what's off so you can fix and re-upload.
+    </p>
+    <button class="btn" type="submit" style="margin-top:12px;">Upload &amp; Check Format</button>
+  </form>
+</div>
+
+<h2>Templates</h2>
+<div class="grid-2">
+  <div class="option-card">
+    <h3>Bot BOM Template</h3>
+    <img src="{{ url_for('static', filename='images/bot_template_preview.png') }}" alt="Bot BOM template preview">
+    <p class="muted">Tracks parts by subsystem, package cost, and whether Railside is providing the part. Only rows where <strong>"Provided by Railside?"</strong> is checked are included in the combined order — everything else is kept as tracked-only.</p>
+    <a class="btn secondary" href="{{ url_for('download_template', kind='bot') }}">Download Bot BOM Template</a>
+    <ol>
+      <li>Make a copy of the Google Sheet template.</li>
+      <li>Fill in every non-green column.</li>
+      <li>File → Download → Comma Separated Values (.csv), or upload the .xlsx directly.</li>
+    </ol>
+  </div>
+  <div class="option-card">
+    <h3>General Supplies &amp; Projects BOM Template</h3>
+    <img src="{{ url_for('static', filename='images/general_template_preview.png') }}" alt="General BOM template preview">
+    <p class="muted">For general supplies, event, and project purchases outside of bot subsystems.</p>
+    <a class="btn secondary" href="{{ url_for('download_template', kind='general') }}">Download General BOM Template</a>
+    <ol>
+      <li>Make a copy of the Google Sheet template.</li>
+      <li>Fill in every non-green column.</li>
+      <li>File → Download → Comma Separated Values (.csv), or upload the .xlsx directly.</li>
+    </ol>
+  </div>
+</div>
+{% endblock %}

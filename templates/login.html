@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - BOM Workspace</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-page">
+    <div class="auth-wrapper">
+        <div class="auth-box">
+            
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-container">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="auth-header">
+                <img src="{{ url_for('static', filename='images/RR Logo.png') }}" alt="RR Logo" class="auth-logo">
+                <h1>BOM Workspace</h1>
+                <p>Please sign in or register a team account</p>
+            </div>
+
+            <!-- Sign In Form -->
+            <div class="auth-section">
+                <h2>🔑 Sign In</h2>
+                <form method="POST" action="{{ url_for('login') }}">
+                    <div class="form-group">
+                        <label for="login-username">Username / Team Name</label>
+                        <input type="text" id="login-username" name="username" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" name="password" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Log In</button>
+                </form>
+            </div>
+
+            <hr class="auth-divider">
+
+            <!-- Register Team Account Form -->
+            <div class="auth-section">
+                <h2>📝 Register Team Account</h2>
+                <form method="POST" action="{{ url_for('register') }}">
+                    <div class="form-group">
+                        <label for="register-username">Team / Username</label>
+                        <input type="text" id="register-username" name="username" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" name="password" required autocomplete="new-password">
+                    </div>
+                    <button type="submit" class="btn btn-secondary btn-block">Create Account</button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

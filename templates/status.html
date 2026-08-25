@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Order Status & Tracking - BOM Workspace{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Order Status & Tracking</h2>
+    <p>Review BOM approval statuses, part fulfillment progress, and team order updates.</p>
+</div>
+
+<section class="card">
+    <h3>Fulfillment Status Overview</h3>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    {% if session.get('is_admin') %}
+                    <th>Team / User</th>
+                    {% endif %}
+                    <th>BOM File</th>
+                    <th>Status</th>
+                    <th>Last Updated</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for st in statuses %}
+                <tr>
+                    {% if session.get('is_admin') %}
+                    <td><strong>{{ st.username }}</strong></td>
+                    {% endif %}
+                    <td>{{ st.filename }}</td>
+                    <td><span class="badge badge-{{ st.status | lower }}">{{ st.status }}</span></td>
+                    <td>{{ st.updated_at }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{% if session.get('is_admin') %}4{% else %}3{% endif %}" class="text-center text-muted">No submissions found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card">
+    <h3>Items & Order Status</h3>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Specs</th>
+                    {% if session.get('is_admin') %}
+                    <th>Team</th>
+                    {% endif %}
+                    <th>Project</th>
+                    <th>Qty</th>
+                    <th>Vendor</th>
+                    <th>Order Status</th>
+                    <th>Storage</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.item }}</td>
+                    <td>{{ item.specs }}</td>
+                    {% if session.get('is_admin') %}
+                    <td>{{ item.team }}</td>
+                    {% endif %}
+                    <td>{{ item.project }}</td>
+                    <td>{{ item.qty }}</td>
+                    <td>{{ item.resolved_vendor or 'Unspecified' }}</td>
+                    
+                    {% if not item.orderable %}
+                        <!-- Special Tracked Items -->
+                        <td><span class="badge secondary">With Team</span></td>
+                        <td><span>-</span></td>
+                        <td><span class="text-muted">Tracked Item</span></td>
+                    {% elif session.get('is_admin') %}
+                        <!-- Admin Interactive Form Cells -->
+                        <form method="POST" action="{{ url_for('status_update', item_id=item.id) }}">
+                            <td>
+                                <select name="order_status">
+                                    {% for st in ORDER_STATUSES %}
+                                        <option value="{{ st }}" {% if (item.order_status or 'Not Ordered') == st %}selected{% endif %}>{{ st }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <select name="storage_location">
+                                    <option value="">(none)</option>
+                                    {% for loc in STORAGE_LOCATIONS %}
+                                        <option value="{{ loc }}" {% if item.storage_location == loc %}selected{% endif %}>{{ loc }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <button type="submit" class="btn small primary">Update</button>
+                            </td>
+                        </form>
+                    {% else %}
+                        <!-- Read-Only View for Standard Teams -->
+                        <td>
+                            <span class="badge">{{ item.order_status or 'Not Ordered' }}</span>
+                        </td>
+                        <td>
+                            <span>{{ item.storage_location or '(none)' }}</span>
+                        </td>
+                        <td>
+                            <span class="text-muted">View Only</span>
+                        </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{% if session.get('is_admin') %}9{% else %}8{% endif %}" class="text-center text-muted">No items found matching your filter criteria.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

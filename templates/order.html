@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_filters.html" import filter_bar %}
+{% block title %}Combined Order{% endblock %}
+{% block content %}
+<h1>Combined order</h1>
+<p class="subtitle">Matching items across every active BOM, combined by item name + ordering specs + vendor. Only orderable rows count here — Bot BOM rows tracked-only (Railside unchecked) live on the <a href="{{ url_for('tracked_view') }}">Tracked Only</a> page.</p>
+
+<div class="summary-strip">
+  <div class="summary-box"><div class="num">{{ summary.boms }}</div><div class="label">Uploaded BOMs</div></div>
+  <div class="summary-box"><div class="num">{{ summary.unique_items }}</div><div class="label">Unique items</div></div>
+  <div class="summary-box"><div class="num">{{ summary.total_units|round(1) }}</div><div class="label">Total units (filtered)</div></div>
+  <div class="summary-box"><div class="num">{{ summary.total_cost|money }}</div><div class="label">Estimated cost (filtered)</div></div>
+</div>
+
+{{ filter_bar(options, args, url_for('order_view')) }}
+
+<div style="margin-bottom:14px;">
+  <a class="btn secondary small" href="{{ url_for('export_combined', **args) }}">⬇ Export this view as CSV</a>
+</div>
+
+<div class="card table-scroll">
+  <table>
+    <tr>
+      <th>Item</th><th>Specs</th><th>Category</th><th>Vendor</th>
+      <th>Total Qty</th><th>Unit Cost</th><th>Combined Cost</th><th>Requested by</th><th>Match</th>
+    </tr>
+    {% for g in groups %}
+    <tr>
+      <td>{{ g.item }}{% if g.link %} &nbsp;<a href="{{ g.link }}" target="_blank" rel="noopener">🔗</a>{% endif %}</td>
+      <td>{{ g.specs }}</td>
+      <td>{{ g.category }}</td>
+      <td>{{ g.vendor }}</td>
+      <td>{{ g.qty|round(2) }}</td>
+      <td>{{ g.unit_cost|money }}</td>
+      <td>{{ g.cost|money }}</td>
+      <td class="muted">{{ g.boms|join(", ") }}</td>
+      <td>{% if g.manual %}<span class="badge badge-info">Manual</span>{% else %}<span class="badge badge-muted">Auto</span>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="empty-state">No items match these filters.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

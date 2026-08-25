@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_filters.html" import filter_bar %}
+{% block title %}By Store / Vendor{% endblock %}
+{% block content %}
+<h1>Store &amp; vendor breakdown</h1>
+<p class="subtitle">Orderable items grouped by where they'll be purchased. Biggest spend first.</p>
+
+<div class="summary-strip">
+  <div class="summary-box"><div class="num">{{ vendor_groups|length }}</div><div class="label">Stores / vendors</div></div>
+  <div class="summary-box"><div class="num">{{ grand_total|money }}</div><div class="label">Grand total</div></div>
+</div>
+
+{{ filter_bar(options, args, url_for('vendors_view')) }}
+
+{% if not vendor_groups %}
+<div class="card empty-state">No orderable items yet.</div>
+{% endif %}
+
+{% for vendor, data in vendor_groups.items() %}
+<div class="vendor-block">
+  <div class="vendor-header">
+    <h3>{{ vendor }} — {{ data.groups|length }} item(s), {{ data.units|round(1) }} units</h3>
+    <div>
+      <strong>{{ data.subtotal|money }}</strong>
+      &nbsp; <a class="btn secondary small" href="{{ url_for('export_vendor', vendor=vendor) }}">⬇ Export this store</a>
+    </div>
+  </div>
+  <div class="vendor-body table-scroll">
+    <table>
+      <tr><th>Item</th><th>Specs</th><th>Category</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Requested by</th></tr>
+      {% for g in data.groups %}
+      <tr>
+        <td>{{ g.item }}{% if g.link %} &nbsp;<a href="{{ g.link }}" target="_blank" rel="noopener">🔗</a>{% endif %}</td>
+        <td>{{ g.specs }}</td>
+        <td>{{ g.category }}</td>
+        <td>{{ g.qty|round(2) }}</td>
+        <td>{{ g.unit_cost|money }}</td>
+        <td>{{ g.cost|money }}</td>
+        <td class="muted">{{ g.boms|join(", ") }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
