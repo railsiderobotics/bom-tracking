@@ -113,12 +113,11 @@ ORDER_STATUSES = [
 ]
 
 STORAGE_LOCATIONS = [
-    "",
-    "Shelf A",
-    "Shelf B",
-    "Bin 1",
-    "Bin 2",
-    "Lab Main Table",
+    "Klondike",
+    "BIDC",
+    "With Team",
+    "RIDGID Cart",
+    "Other"
 ]
 
 SHARED_ADMIN_PASSWORD = os.getenv("SHARED_ADMIN_PASSWORD", "adminpassword123")
