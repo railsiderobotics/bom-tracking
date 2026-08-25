@@ -12,17 +12,87 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
-import db
+import psycopg2
+import psycopg2.extras
 import parser as bomparser
-import sqlite3
 
 # Load environment variables from a local .env file
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "bom-workspace-dev-secret"
+app.secret_key = os.getenv("SECRET_KEY", "bom-workspace-dev-secret")
 
-db.init_db()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+def get_conn():
+    # Neon requires sslmode='require'
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    conn.cursor_factory = psycopg2.extras.DictCursor
+    return conn
+
+def init_db():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS manual_matches (
+            id TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS boms (
+            id SERIAL PRIMARY KEY,
+            team TEXT NOT NULL,
+            project TEXT NOT NULL,
+            notes TEXT,
+            bom_type TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            upload_date TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            status TEXT NOT NULL DEFAULT 'Pending'
+        );
+        CREATE TABLE IF NOT EXISTS bom_items (
+            id SERIAL PRIMARY KEY,
+            bom_id INTEGER NOT NULL REFERENCES boms(id) ON DELETE CASCADE,
+            row_index INTEGER,
+            category TEXT,
+            qty REAL,
+            item TEXT,
+            specs TEXT,
+            link TEXT,
+            vendor TEXT,
+            other_vendor TEXT,
+            resolved_vendor TEXT,
+            event_category TEXT,
+            other_category TEXT,
+            unit_cost REAL,
+            total_cost REAL,
+            physical TEXT,
+            subsystem TEXT,
+            units_per_package REAL,
+            units_per_bot REAL,
+            comments TEXT,
+            orderable INTEGER DEFAULT 1,
+            match_key TEXT,
+            flagged INTEGER DEFAULT 0,
+            order_status TEXT DEFAULT 'Not Ordered',
+            storage_location TEXT DEFAULT '',
+            group_override_id TEXT,
+            is_given INTEGER DEFAULT 0,
+            needs_return INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            is_admin INTEGER NOT NULL DEFAULT 0
+        );
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+init_db()
 
 PENDING = {}
 
@@ -31,11 +101,80 @@ GOOGLE_SHEET_LINKS = {
     "general": "https://docs.google.com/spreadsheets/d/17Z1K6nDZC06eY-0sx92mCxc0LjPqgKk_zKDKtVu-YGM/edit?usp=sharing",
 }
 
-ORDER_STATUSES = db.ORDER_STATUSES
-STORAGE_LOCATIONS = db.STORAGE_LOCATIONS
+ORDER_STATUSES = [
+    "Not Ordered",
+    "Ordered",
+    "Shipped",
+    "Delivered",
+    "Backordered",
+    "Cancelled",
+]
 
-# Securely load the admin password from environment variables
+STORAGE_LOCATIONS = [
+    "",
+    "Shelf A",
+    "Shelf B",
+    "Bin 1",
+    "Bin 2",
+    "Lab Main Table",
+]
+
 SHARED_ADMIN_PASSWORD = os.getenv("SHARED_ADMIN_PASSWORD", "adminpassword123")
+
+def now_iso():
+    from datetime import datetime
+    return datetime.utcnow().isoformat()
+
+def get_submission(sub_id):
+    conn = get_conn()
+    bom = conn.execute("SELECT * FROM boms WHERE id = %s", (sub_id,)).fetchone()
+    if not bom:
+        conn.close()
+        return None
+    items = conn.execute("SELECT * FROM bom_items WHERE bom_id = %s ORDER BY id", (sub_id,)).fetchall()
+    conn.close()
+    return {
+        **dict(bom),
+        "items": [dict(it) for it in items]
+    }
+
+def get_all_pending_submissions():
+    conn = get_conn()
+    boms = conn.execute("SELECT * FROM boms WHERE status = 'Pending' AND active = 1 ORDER BY id DESC").fetchall()
+    conn.close()
+    results = []
+    for b in boms:
+        sub = get_submission(b["id"])
+        if sub:
+            results.append(sub)
+    return results
+
+def update_submission_status(sub_id, status):
+    conn = get_conn()
+    conn.execute("UPDATE boms SET status = %s WHERE id = %s", (status, sub_id))
+    conn.commit()
+    conn.close()
+
+def delete_bom_item(item_id):
+    conn = get_conn()
+    conn.execute("DELETE FROM bom_items WHERE id = %s", (item_id,))
+    conn.commit()
+    conn.close()
+
+def update_vendor_order_status(vendor, order_status, storage_location):
+    conn = get_conn()
+    conn.execute("""
+        UPDATE bom_items 
+        SET order_status = %s, storage_location = %s 
+        WHERE resolved_vendor = %s AND bom_id IN (
+            SELECT id FROM boms WHERE active = 1 AND status = 'Approved'
+        )
+    """, (order_status, storage_location, vendor))
+    conn.commit()
+    conn.close()
+
+def new_match_id():
+    return uuid.uuid4().hex[:12]
 
 def login_required(f):
     @wraps(f)
@@ -67,7 +206,7 @@ app.jinja_env.globals["STORAGE_LOCATIONS"] = STORAGE_LOCATIONS
 app.jinja_env.globals["GOOGLE_SHEET_LINKS"] = GOOGLE_SHEET_LINKS
 
 def fetch_items(active_only=True, orderable_only=False, team_filter=None, approved_only=True):
-    conn = db.get_conn()
+    conn = get_conn()
     q = """
         SELECT bi.*, b.team, b.project, b.bom_type, b.id as bom_pk,
                b.upload_date, b.active as bom_active, b.filename, b.status
@@ -82,10 +221,10 @@ def fetch_items(active_only=True, orderable_only=False, team_filter=None, approv
     if orderable_only:
         clauses.append("bi.orderable = 1")
     if team_filter:
-        clauses.append("b.team = ?")
+        clauses.append("b.team = %s")
     
     if not session.get("is_admin") and session.get("username"):
-        clauses.append("b.team = ?")
+        clauses.append("b.team = %s")
 
     params = []
     if team_filter:
@@ -230,8 +369,8 @@ def login():
             flash("Invalid administrator password.", "error")
             return redirect(url_for("login"))
 
-    conn = db.get_conn()
-    user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    conn = get_conn()
+    user = conn.execute("SELECT * FROM users WHERE username = %s", (username,)).fetchone()
     conn.close()
 
     if user and check_password_hash(user["password_hash"], password):
@@ -259,13 +398,14 @@ def register():
 
     hashed_pw = generate_password_hash(password)
 
-    conn = db.get_conn()
+    conn = get_conn()
     try:
-        conn.execute("INSERT INTO users (username, password, password_hash, is_admin) VALUES (?, ?, ?, 0)",
+        conn.execute("INSERT INTO users (username, password, password_hash, is_admin) VALUES (%s, %s, %s, 0)",
                      (username, password, hashed_pw))
         conn.commit()
         flash("Account created successfully. Please log in.", "success")
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
+        conn.rollback()
         flash("Username already taken.", "error")
     finally:
         conn.close()
@@ -383,13 +523,15 @@ def review_confirm(token):
     project = request.form.get("project", "").strip() or "Untitled Project"
     notes = request.form.get("notes", "").strip()
 
-    conn = db.get_conn()
-    cur = conn.execute(
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
         "INSERT INTO boms (team, project, notes, bom_type, filename, upload_date, active, status) "
-        "VALUES (?, ?, ?, ?, ?, ?, 1, 'Pending')",
-        (team, project, notes, pending["bom_type"], pending["filename"], db.now_iso()),
+        "VALUES (%s, %s, %s, %s, %s, %s, 1, 'Pending') RETURNING id",
+        (team, project, notes, pending["bom_type"], pending["filename"], now_iso()),
     )
-    bom_id = cur.lastrowid
+    bom_id = cur.fetchone()[0]
+    
     for it in pending["items"]:
         specs_lower = (it.get("specs") or "").strip().lower()
         orderable = 0 if any(k in specs_lower for k in ["filament", "stock", "urethane"]) else it["orderable"]
@@ -401,7 +543,7 @@ def review_confirm(token):
                 unit_cost, total_cost, physical, subsystem, units_per_package,
                 units_per_bot, comments, orderable, match_key, flagged,
                 order_status, storage_location, is_given, needs_return)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 0, 0)""",
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, 0, 0)""",
             (
                 bom_id, it["row_index"], it["category"], it["qty"], it["item"],
                 it["specs"], it["link"], it["vendor"], it["other_vendor"],
@@ -413,6 +555,7 @@ def review_confirm(token):
             ),
         )
     conn.commit()
+    cur.close()
     conn.close()
     del PENDING[token]
     flash(f"Submitted '{project}' for admin review.", "success")
@@ -428,11 +571,11 @@ def review_cancel(token):
 @app.route("/history")
 @login_required
 def history():
-    conn = db.get_conn()
+    conn = get_conn()
     if session.get("is_admin"):
         boms = conn.execute("SELECT * FROM boms ORDER BY id DESC").fetchall()
     else:
-        boms = conn.execute("SELECT * FROM boms WHERE team = ? ORDER BY id DESC", (session.get("username"),)).fetchall()
+        boms = conn.execute("SELECT * FROM boms WHERE team = %s ORDER BY id DESC", (session.get("username"),)).fetchall()
     conn.close()
     rows = []
     def is_special_item_row(i):
@@ -441,7 +584,7 @@ def history():
 
     for b in boms:
         b_dict = dict(b)
-        items = db.get_submission(b_dict["id"])["items"]
+        items = get_submission(b_dict["id"])["items"]
         cost = sum((i["total_cost"] or 0) for i in items if i.get("orderable") or is_special_item_row(i))
         rows.append({
             "bom": b_dict,
@@ -454,7 +597,7 @@ def history():
 @app.route("/team/bom/<int:sub_id>")
 @login_required
 def view_team_bom(sub_id):
-    submission = db.get_submission(sub_id)
+    submission = get_submission(sub_id)
     if not submission or (not session.get("is_admin") and submission["team"] != session.get("username")):
         flash("Submission not found or unauthorized.", "error")
         return redirect(url_for("history"))
@@ -474,13 +617,13 @@ def view_team_bom(sub_id):
 @app.route("/admin/approvals")
 @admin_required
 def admin_approvals():
-    pending_subs = db.get_all_pending_submissions()
+    pending_subs = get_all_pending_submissions()
     return render_template("admin_approvals.html", submissions=pending_subs)
 
 @app.route("/admin/item/<int:item_id>/delete", methods=["POST"])
 @admin_required
 def admin_delete_item(item_id):
-    db.delete_bom_item(item_id)
+    delete_bom_item(item_id)
     flash("Line item deleted.", "info")
     return redirect(url_for("admin_approvals"))
 
@@ -489,22 +632,22 @@ def admin_delete_item(item_id):
 def handle_approval(sub_id, action):
     if action == 'approve':
         return_item_ids = request.form.getlist("needs_return_items")
-        conn = db.get_conn()
-        conn.execute("UPDATE bom_items SET needs_return = 0 WHERE bom_id = ?", (sub_id,))
+        conn = get_conn()
+        conn.execute("UPDATE bom_items SET needs_return = 0 WHERE bom_id = %s", (sub_id,))
         if return_item_ids:
-            qmarks = ",".join("?" for _ in return_item_ids)
-            conn.execute(f"UPDATE bom_items SET needs_return = 1 WHERE id IN ({qmarks}) AND bom_id = ?", (*return_item_ids, sub_id))
+            qmarks = ",".join(["%s"] * len(return_item_ids))
+            conn.execute(f"UPDATE bom_items SET needs_return = 1 WHERE id IN ({qmarks}) AND bom_id = %s", (*return_item_ids, sub_id))
         conn.commit()
         conn.close()
 
-        db.update_submission_status(sub_id, 'Approved')
+        update_submission_status(sub_id, 'Approved')
         flash("BOM approved, return configuration saved, and added to master order list.", "success")
         return redirect(url_for('tracked_view'))
     elif action == 'reject':
-        db.update_submission_status(sub_id, 'Rejected')
+        update_submission_status(sub_id, 'Rejected')
         flash("BOM submission rejected.", "info")
     elif action == 'unapprove':
-        db.update_submission_status(sub_id, 'Pending')
+        update_submission_status(sub_id, 'Pending')
         flash("BOM approval cancelled.", "info")
 
     return redirect(url_for('admin_approvals'))
@@ -512,7 +655,7 @@ def handle_approval(sub_id, action):
 @app.route("/admin/returns", methods=["GET"])
 @admin_required
 def admin_returns():
-    conn = db.get_conn()
+    conn = get_conn()
     teams_query = conn.execute("SELECT DISTINCT b.team FROM boms b JOIN bom_items bi ON b.id = bi.bom_id WHERE b.active = 1 AND b.status = 'Approved' ORDER BY b.team").fetchall()
     teams = [t["team"] for t in teams_query]
 
@@ -533,7 +676,7 @@ def admin_returns():
             SELECT bi.*, b.team, b.project, b.filename
             FROM bom_items bi
             JOIN boms b ON bi.bom_id = b.id
-            WHERE b.active = 1 AND b.status = 'Approved' AND b.team = ? AND bi.needs_return = 1
+            WHERE b.active = 1 AND b.status = 'Approved' AND b.team = %s AND bi.needs_return = 1
             ORDER BY b.project
         """
         return_items = [dict(row) for row in conn.execute(q, (selected_team,)).fetchall()]
@@ -544,14 +687,14 @@ def admin_returns():
 @app.route("/bom/<int:bom_id>/delete", methods=["POST"])
 @login_required
 def delete_bom(bom_id):
-    conn = db.get_conn()
+    conn = get_conn()
     if not session.get("is_admin"):
-        bom = conn.execute("SELECT * FROM boms WHERE id = ? AND team = ?", (bom_id, session.get("username"))).fetchone()
+        bom = conn.execute("SELECT * FROM boms WHERE id = %s AND team = %s", (bom_id, session.get("username"))).fetchone()
         if not bom:
             conn.close()
             flash("Unauthorized action.", "error")
             return redirect(url_for("history"))
-    conn.execute("UPDATE boms SET active = 0 WHERE id = ?", (bom_id,))
+    conn.execute("UPDATE boms SET active = 0 WHERE id = %s", (bom_id,))
     conn.commit()
     conn.close()
     flash("BOM removed.", "info")
@@ -560,14 +703,14 @@ def delete_bom(bom_id):
 @app.route("/bom/<int:bom_id>/restore", methods=["POST"])
 @login_required
 def restore_bom(bom_id):
-    conn = db.get_conn()
+    conn = get_conn()
     if not session.get("is_admin"):
-        bom = conn.execute("SELECT * FROM boms WHERE id = ? AND team = ?", (bom_id, session.get("username"))).fetchone()
+        bom = conn.execute("SELECT * FROM boms WHERE id = %s AND team = %s", (bom_id, session.get("username"))).fetchone()
         if not bom:
             conn.close()
             flash("Unauthorized action.", "error")
             return redirect(url_for("history"))
-    conn.execute("UPDATE boms SET active = 1 WHERE id = ?", (bom_id,))
+    conn.execute("UPDATE boms SET active = 1 WHERE id = %s", (bom_id,))
     conn.commit()
     conn.close()
     flash("BOM restored.", "info")
@@ -594,12 +737,12 @@ def order_view():
 @app.route("/order/tracked", methods=["GET", "POST"])
 @admin_required
 def tracked_view():
-    conn = db.get_conn()
+    conn = get_conn()
     if request.method == "POST":
         item_id = request.form.get("item_id")
         action = request.form.get("action")
         if action == "toggle_given":
-            conn.execute("UPDATE bom_items SET is_given = NOT COALESCE(is_given, 0) WHERE id = ?", (item_id,))
+            conn.execute("UPDATE bom_items SET is_given = NOT COALESCE(is_given, FALSE) WHERE id = %s", (item_id,))
             conn.commit()
         conn.close()
         return redirect(url_for("tracked_view"))
@@ -628,7 +771,7 @@ def tracked_view():
 @app.route("/admin/teams")
 @admin_required
 def admin_teams_view():
-    conn = db.get_conn()
+    conn = get_conn()
     team_names = set()
     users = conn.execute("SELECT username, password FROM users WHERE is_admin = 0").fetchall()
     user_passwords = {}
@@ -646,7 +789,7 @@ def admin_teams_view():
             SELECT SUM(bi.total_cost) as total_spent
             FROM bom_items bi
             JOIN boms b ON bi.bom_id = b.id
-            WHERE b.team = ? AND b.active = 1 AND b.status = 'Approved'
+            WHERE b.team = %s AND b.active = 1 AND b.status = 'Approved'
               AND (
                   bi.orderable = 1
                   OR lower(bi.item) LIKE '%filament%'
@@ -661,12 +804,12 @@ def admin_teams_view():
         total_spent = spent_row["total_spent"] if spent_row and spent_row["total_spent"] else 0.0
         
         pending_count = conn.execute(
-            "SELECT COUNT(*) as cnt FROM boms WHERE team = ? AND status = 'Pending' AND active = 1", 
+            "SELECT COUNT(*) as cnt FROM boms WHERE team = %s AND status = 'Pending' AND active = 1", 
             (t_name,)
         ).fetchone()["cnt"]
         
         approved_count = conn.execute(
-            "SELECT COUNT(*) as cnt FROM boms WHERE team = ? AND status = 'Approved' AND active = 1", 
+            "SELECT COUNT(*) as cnt FROM boms WHERE team = %s AND status = 'Approved' AND active = 1", 
             (t_name,)
         ).fetchone()["cnt"]
         
@@ -715,7 +858,7 @@ def matches_view():
             "rows": items
         })
 
-    conn = db.get_conn()
+    conn = get_conn()
     active_matches = conn.execute(
         "SELECT * FROM manual_matches WHERE active = 1 ORDER BY id DESC"
     ).fetchall()
@@ -737,15 +880,15 @@ def matches_combine():
     if len(ids) < 2:
         flash("Select at least two rows to combine.", "error")
         return redirect(url_for("matches_view"))
-    match_id = db.new_match_id()
-    conn = db.get_conn()
+    match_id = new_match_id()
+    conn = get_conn()
     conn.execute(
-        "INSERT INTO manual_matches (id, created_at, active) VALUES (?, ?, 1)",
-        (match_id, db.now_iso()),
+        "INSERT INTO manual_matches (id, created_at, active) VALUES (%s, %s, 1)",
+        (match_id, now_iso()),
     )
     for iid in ids:
         conn.execute(
-            "UPDATE bom_items SET group_override_id = ? WHERE id = ?", (match_id, iid)
+            "UPDATE bom_items SET group_override_id = %s WHERE id = %s", (match_id, iid)
         )
     conn.commit()
     conn.close()
@@ -755,9 +898,9 @@ def matches_combine():
 @app.route("/matches/undo/<match_id>", methods=["POST"])
 @admin_required
 def matches_undo(match_id):
-    conn = db.get_conn()
-    conn.execute("UPDATE bom_items SET group_override_id = NULL WHERE group_override_id = ?", (match_id,))
-    conn.execute("UPDATE manual_matches SET active = 0 WHERE id = ?", (match_id,))
+    conn = get_conn()
+    conn.execute("UPDATE bom_items SET group_override_id = NULL WHERE group_override_id = %s", (match_id,))
+    conn.execute("UPDATE manual_matches SET active = 0 WHERE id = %s", (match_id,))
     conn.commit()
     conn.close()
     flash("Manual match undone.", "info")
@@ -809,11 +952,11 @@ def status_view():
     for i in items:
         counts[i["order_status"] or "Not Ordered"] += (i["qty"] or 0)
 
-    conn = db.get_conn()
+    conn = get_conn()
     if session.get("is_admin"):
         boms = conn.execute("SELECT team as username, filename, status, upload_date as updated_at FROM boms WHERE active = 1 ORDER BY upload_date DESC").fetchall()
     else:
-        boms = conn.execute("SELECT team as username, filename, status, upload_date as updated_at FROM boms WHERE active = 1 AND team = ? ORDER BY upload_date DESC", (target_team,)).fetchall()
+        boms = conn.execute("SELECT team as username, filename, status, upload_date as updated_at FROM boms WHERE active = 1 AND team = %s ORDER BY upload_date DESC", (target_team,)).fetchall()
     statuses = [dict(b) for b in boms]
     conn.close()
 
@@ -833,9 +976,9 @@ def status_update(item_id):
         order_status = "Not Ordered"
     if storage_location not in STORAGE_LOCATIONS:
         storage_location = ""
-    conn = db.get_conn()
+    conn = get_conn()
     conn.execute(
-        "UPDATE bom_items SET order_status = ?, storage_location = ? WHERE id = ?",
+        "UPDATE bom_items SET order_status = %s, storage_location = %s WHERE id = %s",
         (order_status, storage_location, item_id),
     )
     conn.commit()
@@ -849,7 +992,7 @@ def status_vendor_update():
     order_status = request.form.get("order_status", "Not Ordered")
     storage_location = request.form.get("storage_location", "")
     if vendor:
-        db.update_vendor_order_status(vendor, order_status, storage_location)
+        update_vendor_order_status(vendor, order_status, storage_location)
         flash(f"Updated all items for vendor '{vendor}' to status: {order_status}.", "success")
     return redirect(url_for("status_view"))
 
@@ -864,10 +1007,10 @@ def status_bulk_update():
     if storage_location not in STORAGE_LOCATIONS:
         storage_location = ""
     if row_ids:
-        conn = db.get_conn()
-        qmarks = ",".join("?" for _ in row_ids)
+        conn = get_conn()
+        qmarks = ",".join(["%s"] * len(row_ids))
         conn.execute(
-            f"UPDATE bom_items SET order_status = ?, storage_location = ? WHERE id IN ({qmarks})",
+            f"UPDATE bom_items SET order_status = %s, storage_location = %s WHERE id IN ({qmarks})",
             (order_status, storage_location, *row_ids),
         )
         conn.commit()
