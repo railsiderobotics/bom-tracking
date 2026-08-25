@@ -871,7 +871,7 @@ def admin_teams_view():
         if not t_name:
             continue
             
-        # Total spent query with tuple-safe parameter passing
+        # Total spent query with escaped percent signs (%%) to fix psycopg2 tuple index errors
         cur.execute("""
             SELECT SUM(bi.total_cost) as total_spent
             FROM bom_items bi
@@ -879,12 +879,12 @@ def admin_teams_view():
             WHERE b.team = %s AND b.active = 1 AND b.status = 'Approved'
               AND (
                   bi.orderable = 1
-                  OR lower(bi.item) LIKE '%filament%'
-                  OR lower(bi.specs) LIKE '%filament%'
-                  OR lower(bi.item) LIKE '%urethane%'
-                  OR lower(bi.specs) LIKE '%urethane%'
-                  OR lower(bi.item) LIKE '%stock%'
-                  OR lower(bi.specs) LIKE '%stock%'
+                  OR lower(bi.item) LIKE '%%filament%%'
+                  OR lower(bi.specs) LIKE '%%filament%%'
+                  OR lower(bi.item) LIKE '%%urethane%%'
+                  OR lower(bi.specs) LIKE '%%urethane%%'
+                  OR lower(bi.item) LIKE '%%stock%%'
+                  OR lower(bi.specs) LIKE '%%stock%%'
               )
         """, (str(t_name),))
         spent_row = cur.fetchone()
