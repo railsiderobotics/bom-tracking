@@ -139,9 +139,18 @@ def get_submission(sub_id):
     items = cur.fetchall()
     cur.close()
     conn.close()
+    
+    bom_dict = dict(bom)
     return {
-        **dict(bom),
-        "items": [dict(it) for it in items]
+        "bom": bom_dict,
+        "items": [dict(it) for it in items],
+        "team": bom_dict.get("team"),
+        "project": bom_dict.get("project"),
+        "status": bom_dict.get("status"),
+        "id": bom_dict.get("id"),
+        "bom_type": bom_dict.get("bom_type"),
+        "filename": bom_dict.get("filename"),
+        "notes": bom_dict.get("notes")
     }
 
 def get_all_pending_submissions():
