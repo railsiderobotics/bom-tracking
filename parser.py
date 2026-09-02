@@ -137,11 +137,8 @@ def parse_general_rows(grid):
         resolved_vendor = other_vendor if vendor.lower() == "other" and other_vendor else vendor
         vendor_lower = resolved_vendor.lower()
         category = other_cat if event_cat.lower() == "other" and other_cat else event_cat
-        cat_lower = category.lower()
-        item_lower = item_name.lower()
-        
         is_railside = "railside" in vendor_lower
-        is_filament = "filament" in item_lower or "filament" in cat_lower
+        is_filament = "filament" in specs.lower()
 
         orderable = 1
         flags = []
@@ -230,9 +227,8 @@ def parse_bot_rows(grid):
         resolved_vendor = other_vendor if vendor.lower() == "other" and other_vendor else vendor
         
         vendor_lower = resolved_vendor.lower()
-        item_lower = item_name.lower()
         is_railside = "railside" in vendor_lower or _truthy(railside)
-        is_filament = "filament" in item_lower
+        is_filament = "filament" in specs.lower()
 
         orderable = 1 if _truthy(railside) else 0
         if is_filament:

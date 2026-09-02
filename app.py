@@ -647,8 +647,8 @@ def history():
     conn.close()
     rows = []
     def is_special_item_row(i):
-        s = " ".join([str(i.get("item") or ""), str(i.get("specs") or ""), str(i.get("category") or ""), str(i.get("resolved_vendor") or "")]).lower()
-        return ("filament" in s) or ("urethane" in s) or ("tpu" in s) or ("stock" in s)
+        s = (i.get("specs") or "").lower()
+        return ("filament" in s) or ("urethane" in s) or ("stock" in s)
 
     for b in boms:
         b_dict = dict(b)
@@ -671,8 +671,8 @@ def view_team_bom(sub_id):
         flash("Submission not found or unauthorized.", "error")
         return redirect(url_for("history"))
     def is_special_item(it):
-        s = " ".join([str(it.get("item") or ""), str(it.get("specs") or ""), str(it.get("category") or ""), str(it.get("resolved_vendor") or "")]).lower()
-        return ("filament" in s) or ("urethane" in s) or ("tpu" in s) or ("stock" in s)
+        s = (it.get("specs") or "").lower()
+        return ("filament" in s) or ("urethane" in s) or ("stock" in s)
 
     total_cost = 0.0
     for it in submission["items"]:
@@ -824,8 +824,8 @@ def tracked_view():
     items = fetch_items(active_only=True, orderable_only=False, approved_only=True)
     
     def is_ignored_material(it):
-        s = " ".join([str(it.get("item") or ""), str(it.get("specs") or ""), str(it.get("category") or ""), str(it.get("resolved_vendor") or "")]).lower()
-        return ("filament" in s) or ("urethane" in s) or ("tpu" in s) or ("stock" in s)
+        s = (it.get("specs") or "").lower()
+        return ("filament" in s) or ("urethane" in s) or ("stock" in s)
 
     def is_ignored_by_vendor(it):
         name = (it.get("item") or "").lower()
@@ -871,11 +871,8 @@ def admin_teams_view():
             WHERE b.team = %s AND b.active = 1 AND b.status = 'Approved'
               AND (
                   bi.orderable = 1
-                  OR lower(bi.item) LIKE '%%filament%%'
                   OR lower(bi.specs) LIKE '%%filament%%'
-                  OR lower(bi.item) LIKE '%%urethane%%'
                   OR lower(bi.specs) LIKE '%%urethane%%'
-                  OR lower(bi.item) LIKE '%%stock%%'
                   OR lower(bi.specs) LIKE '%%stock%%'
               )
         """, (str(t_name),))
@@ -1003,8 +1000,8 @@ def status_view():
     options = filter_options(fetch_items(active_only=True, orderable_only=False, approved_only=not session.get("is_admin")))
     
     def is_ignored_material(it):
-        s = " ".join([str(it.get("item") or ""), str(it.get("specs") or ""), str(it.get("category") or ""), str(it.get("resolved_vendor") or "")]).lower()
-        return ("filament" in s) or ("urethane" in s) or ("tpu" in s) or ("stock" in s)
+        s = (it.get("specs") or "").lower()
+        return ("filament" in s) or ("urethane" in s) or ("stock" in s)
 
     raw_items = [i for i in items if not is_ignored_material(i)]
 
