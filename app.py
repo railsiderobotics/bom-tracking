@@ -276,6 +276,9 @@ def fetch_items(active_only=True, orderable_only=False, team_filter=None, approv
         parsed_rows.append(d)
     return parsed_rows
 
+def pending_order_items(items):
+    return [it for it in items if (it.get("order_status") or "Not Ordered") == "Not Ordered"]
+
 def group_items(items):
     groups = defaultdict(lambda: {
         "item": "", "specs": "", "vendor": "", "category": "", "link": "",
@@ -903,7 +906,7 @@ def admin_teams_view():
 @app.route("/vendors")
 @admin_required
 def vendors_view():
-    items = fetch_items(active_only=True, orderable_only=True, approved_only=True)
+    items = pending_order_items(fetch_items(active_only=True, orderable_only=True, approved_only=True))
     items = apply_filters(items, request.args)
     by_vendor = defaultdict(list)
     for it in items:
@@ -917,7 +920,7 @@ def vendors_view():
             "units": sum(x["qty"] for x in g),
         }
     vendor_groups = dict(sorted(vendor_groups.items(), key=lambda kv: -kv[1]["subtotal"]))
-    options = filter_options(fetch_items(active_only=True, orderable_only=True, approved_only=True))
+    options = filter_options(pending_order_items(fetch_items(active_only=True, orderable_only=True, approved_only=True)))
     grand_total = sum(v["subtotal"] for v in vendor_groups.values())
     return render_template("vendors.html", vendor_groups=vendor_groups, options=options,
                            args=request.args, grand_total=grand_total)
@@ -1116,7 +1119,7 @@ def export_combined():
 @app.route("/export/vendor/<path:vendor>.csv")
 @admin_required
 def export_vendor(vendor):
-    items = fetch_items(active_only=True, orderable_only=True, approved_only=True)
+    items = pending_order_items(fetch_items(active_only=True, orderable_only=True, approved_only=True))
     its = [i for i in items if (i["resolved_vendor"] or "Unspecified") == vendor]
     groups = group_items(its)
     safe = "".join(c if c.isalnum() else "_" for c in vendor)
